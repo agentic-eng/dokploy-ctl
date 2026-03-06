@@ -1,0 +1,36 @@
+[project]
+name = "dokployctl"
+version = "0.1.0"
+description = "CLI for Dokploy deployments — deploy, poll, verify, debug."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{name = "Denis Tomilin"}]
+dependencies = [
+    "click>=8,<9",
+    "httpx>=0.28,<1.0",
+    "websockets>=15,<16",
+]
+
+[project.scripts]
+dokployctl = "dokployctl.cli:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dokployctl"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "PIE", "RET", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.9"]
