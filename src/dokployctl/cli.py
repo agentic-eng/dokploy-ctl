@@ -5,9 +5,12 @@ import click
 from dokployctl.api_cmd import api
 from dokployctl.client import DEFAULT_CONFIG_DIR
 from dokployctl.deploy import deploy, sync
+from dokployctl.find_cmd import find
 from dokployctl.init_cmd import init
 from dokployctl.logs import logs
+from dokployctl.start_cmd import start
 from dokployctl.status import status
+from dokployctl.stop_cmd import stop
 
 
 @click.group()
@@ -28,8 +31,11 @@ def login(url: str, token: str) -> None:
 
 
 cli.add_command(api)
+cli.add_command(find)
 cli.add_command(status)
 cli.add_command(logs)
 cli.add_command(deploy)
 cli.add_command(sync)
 cli.add_command(init)
+cli.add_command(stop)
+cli.add_command(start)
