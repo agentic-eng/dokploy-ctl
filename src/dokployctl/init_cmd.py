@@ -6,6 +6,7 @@ import sys
 import click
 
 from dokployctl.client import _err, api_call, load_config, make_client, print_response
+from dokployctl.timer import Timer
 
 
 @click.command()
@@ -13,9 +14,11 @@ from dokployctl.client import _err, api_call, load_config, make_client, print_re
 @click.argument("app_name")
 def init(project_id: str, app_name: str) -> None:
     """Create new compose app (with sourceType fix)."""
+    timer = Timer()
     url, token = load_config()
     client = make_client(url, token)
 
+    timer.log("Creating compose app...")
     resp = api_call(
         client,
         "POST",
@@ -36,8 +39,9 @@ def init(project_id: str, app_name: str) -> None:
         click.echo(json.dumps(result, indent=2))
         sys.exit(1)
 
-    click.echo(f"Created compose app: {compose_id}")
+    timer.log(f"Created compose app: {compose_id}")
 
+    timer.log("Fixing sourceType to 'raw'...")
     fix_resp = api_call(
         client,
         "POST",
@@ -50,7 +54,10 @@ def init(project_id: str, app_name: str) -> None:
     if fix_resp.is_error:
         _err(f"warning: failed to fix sourceType (HTTP {fix_resp.status_code})")
     else:
-        click.echo("Fixed sourceType to 'raw'")
+        timer.log("Fixed sourceType to 'raw'")
 
-    click.echo(f"\nCompose ID: {compose_id}")
-    click.echo(f"Use: dokployctl deploy {compose_id} docker-compose.prod.yml")
+    timer.summary(f"Done. Compose ID: {compose_id}")
+
+    click.echo("\nNext steps:")
+    click.echo(f"  dokployctl deploy {compose_id} docker-compose.prod.yml --env")
+    click.echo(f"  dokployctl status {compose_id}")

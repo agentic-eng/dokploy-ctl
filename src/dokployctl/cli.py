@@ -13,10 +13,13 @@ from dokployctl.status import status
 from dokployctl.stop_cmd import stop
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(package_name="dokployctl")
-def cli() -> None:
+@click.pass_context
+def cli(ctx: click.Context) -> None:
     """dokployctl — CLI for Dokploy deployments."""
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(find)
 
 
 @cli.command()
