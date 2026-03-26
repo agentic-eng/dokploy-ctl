@@ -21,11 +21,11 @@ Each poll cycle produces a snapshot:
 ```python
 @dataclass
 class ContainerState:
-    container_id: str
-    service: str        # parsed from container name
+    container_id: str   # from API's "containerId" (camelCase)
+    service: str        # via parse_service_name() from output.py
     state: str          # running, exited, restarting, created
-    health: str         # healthy, unhealthy, starting, —
-    image: str
+    health: str         # via parse_health() from output.py: healthy, unhealthy, starting, —
+    image: str          # from API's "image"
 
 @dataclass
 class PollSnapshot:
@@ -66,6 +66,21 @@ Derived from comparing current containers against the pre-deploy snapshot:
 
 Phase labels are heuristic — they may be wrong. The raw transitions are always emitted alongside them so the agent can override the heuristic's judgment.
 
+### Pre-Deploy Snapshot Capture
+
+Before calling `compose.deploy`, the deploy command:
+1. Calls `compose.one` to get `appName` (already done in current code)
+2. Calls `get_containers(client, app_name)` to capture current container IDs
+3. Passes both `app_name` and `pre_deploy_ids: set[str]` to the polling loop
+
+The polling loop constructor receives these and uses them throughout. Each poll cycle calls `get_containers(client, app_name)` — this calls `docker.getContainers` (no server-side filter, returns all host containers) and filters client-side by `app_name`. This is the existing behavior and is acceptable.
+
+**API response shape**: `docker.getContainers` returns dicts with camelCase keys: `containerId`, `name`, `state`, `status`, `image`, `ports`. The `ContainerState` dataclass maps these to snake_case fields during construction.
+
+### Health Verification (Step 5) — Absorbed
+
+The current deploy has a separate post-poll health verification step (`verify_container_health`, 120s timeout). The new polling loop already tracks health convergence via container transitions — when all containers reach `healthy`, the loop exits. **Step 5 is removed.** The polling loop's `phase: healthy` detection replaces it entirely. This avoids up to 2 minutes of redundant waiting on clean deploys.
+
 ### Stall Detection
 
 If no transitions detected for `stall_threshold` seconds (default: 90):
@@ -77,6 +92,42 @@ If no transitions detected for `stall_threshold` seconds (default: 90):
 ```
 
 Stall warnings are advisory — the tool does not abort. The agent decides whether to wait or investigate.
+
+After the first stall warning fires, subsequent heartbeats say `(still stalled)` instead of repeating the full warning:
+```
+[03:00] WARNING: no container changes for 90s. Deploy may be stalled.
+[03:30] (no changes for 30s — still stalled)
+[04:00] (no changes for 30s — still stalled)
+```
+
+### Error Path (deploy status=error)
+
+When Dokploy reports `status=error`, the polling loop:
+1. Emits the error with timestamp: `[01:30] Deploy failed: "error message"`
+2. Auto-fetches the deploy build log (same as current behavior)
+3. Auto-fetches container logs for problem services (exited, unhealthy)
+4. Emits per-service hints via `hint_deploy_failed()`
+5. Includes the last known container transitions for context
+
+```
+[01:30] deploy=error | Deploy failed: "exit code 1"
+[01:30]
+[01:30] Container transitions before failure:
+[01:30]   [00:25] worker: running → stopped
+[01:30]   [00:31] db: running → stopped
+[01:30]   [01:15] db: appeared (starting)
+[01:30]   [01:21] worker: appeared (exited)
+[01:30]
+[01:30] === Deploy build log ===
+[01:30]   ...
+[01:31] === Logs: worker (exited, container: a1b2c3d4) ===
+[01:31]   FileNotFoundError: /app/run.sh
+[01:31]
+[01:31] Hint: worker failed (exited(1)). Check the Dockerfile entrypoint.
+[01:31]   dokploy-ctl logs <id> --service worker --tail 200
+```
+
+The transition history gives the agent context: "the old containers shut down fine, new ones started, worker immediately crashed." This is much more useful than just "deploy failed."
 
 ### Output Format
 
