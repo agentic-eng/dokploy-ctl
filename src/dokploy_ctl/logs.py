@@ -11,7 +11,7 @@ from dokploy_ctl.websocket import fetch_container_logs, fetch_deploy_log
 @click.command(cls=DashSafeCommand)
 @click.argument("compose_id", type=DOKPLOY_ID)
 @click.option("--service", "-s", default=None, help="Filter to a specific service name")
-@click.option("--tail", "-n", default=100, help="Number of lines (default: 100)")
+@click.option("--tail", "--lines", "-n", default=100, help="Number of lines (default: 100)")
 @click.option("--since", default="5m", help="Time filter: 30s, 5m, 1h, all (default: 5m)")
 @click.option("--deploy", "-D", "show_deploy", is_flag=True, help="Show deploy build log instead")
 def logs(compose_id: str, service: str | None, tail: int, since: str, show_deploy: bool) -> None:
